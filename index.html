@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>सिलाई उत्पादन लॉग</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2c3e50">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
+</head>
+<body>
+
+    <div class="app-header">
+        <div class="header-info">
+            <span id="headerStaff">सिलाई उत्पादन लॉग 📊</span>
+        </div>
+        <div class="menu-container">
+            <button id="menuBtn" class="menu-btn">⫶</button>
+            <div id="dropdownMenu" class="dropdown-content hidden">
+                <div class="menu-filter-box">
+                    <label>📅 महीना चुनें (26-25 चक्र):</label>
+                    <select id="reportMonthFilter"></select>
+                </div>
+                <a href="#" id="menuDownloadExcel">📥 इस महीने की Excel</a>
+                <hr>
+                <a href="#" id="menuInstallApp">📲 ऐप इंस्टॉल करें</a>
+                <a href="#" id="menuShareApp">🔗 ऐप शेयर करें</a>
+                <a href="#" id="menuHelp">❓ मदद (Help)</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container" id="mainApp">
+        
+        <div class="input-group" style="background: #fff3cd; padding: 12px; border-radius: 8px; border: 1px solid #ffeeba; margin-bottom: 15px;">
+            <label style="color: #856404; font-weight: bold;">🔑 डेटा बैकअप अकाउंट (नाम या मोबाइल नंबर डालें):</label>
+            <div style="display: flex; gap: 8px; margin-top: 5px;">
+                <input type="text" id="backupUserIdInput" placeholder="अपना नाम या मोबाइल नंबर भरें..." style="flex: 1; padding: 8px; margin: 0;">
+                <button id="saveBackupUserBtn" style="width: auto; padding: 8px 15px; background: #28a745; font-size: 14px;">लिंक करें</button>
+            </div>
+            <small id="backupStatusText" style="display: block; margin-top: 5px; color: #721c24; font-weight: bold; font-size: 12px;">⚠️ अभी डेटा असुरक्षित है! ऊपर नाम डालकर लिंक करें।</small>
+        </div>
+
+        <h2>Daily Entry (सिलाई लॉग)</h2>
+        <input type="hidden" id="activity" value="STITCHING">
+
+        <div class="input-group" style="background: #e8f4fd; padding: 12px; border-radius: 8px; border: 1px dashed #2980b9; margin-bottom: 15px;">
+            <label style="color: #2980b9; font-weight: bold;">📸 पर्ची स्कैन करें (ऑटो फिल):</label>
+            <input type="file" id="imageScannerInput" accept="image/*" style="padding: 5px; background: none; border: none;">
+            <small id="ocrStatus" style="display: block; margin-top: 5px; color: #7f8c8d; font-size: 11px;">फोटो अपलोड करते ही डेटा अपने आप भर जाएगा।</small>
+        </div>
+
+        <div class="input-group">
+            <label>तारीख (Date):</label>
+            <input type="date" id="entryDate">
+        </div>
+
+        <div class="input-group">
+            <label>आकार/माप (Size):</label>
+            <input type="text" id="itemSize" list="sizeOptions" placeholder="साइज चुनें या यहाँ टाइप करें...">
+            <datalist id="sizeOptions">
+                <option value="18*18"></option>
+                <option value="20*20"></option>
+                <option value="14*19"></option>
+                <option value="14*20"></option>
+                <option value="50*50"></option>
+                <option value="70*70"></option>
+                <option value="60*84"></option>
+                <option value="60*102"></option>
+                <option value="30*84"></option>
+                <option value="30*63"></option>
+                <option value="14*72"></option>
+                <option value="14*90"></option>
+            </datalist>
+        </div>
+
+        <div class="input-group">
+            <label>कुल मात्रा (Total Pcs):</label>
+            <input type="number" id="quantity" min="1" placeholder="0">
+        </div>
+
+        <div class="input-group">
+            <label>रेट (1 Pcs Rate):</label>
+            <input type="number" step="0.01" min="0" id="rate" placeholder="0.00">
+        </div>
+
+        <button id="saveEntryBtn">Data Entry Save Karein</button>
+        
+        <div id="monthlyTotalBox" style="margin-top: 20px; background: #27ae60; color: white; padding: 12px; border-radius: 8px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <span id="salaryBoxLabel" style="font-size: 14px; font-weight: bold; display: block; opacity: 0.9;">आज की कुल कमाई (Today's Total):</span>
+            <span id="grandTotalSalary" style="font-size: 26px; font-weight: 800; display: block; margin-top: 3px;">₹0.00</span>
+        </div>
+
+        <div class="custom-filter-panel" style="margin-top: 20px; background: #f8f9fa; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <span style="font-weight: bold; font-size: 14px; display: block; margin-bottom: 8px; color: #2c3e50;">🔍 कस्टम तारीख से तारीख हिसाब:</span>
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <div style="flex: 1;">
+                    <label style="font-size: 11px; color:#666;">कब से:</label>
+                    <input type="date" id="filterFromDate" style="width:100%; padding:6px; font-size:13px; border-radius:4px; border:1px solid #ccc;">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-size: 11px; color:#666;">कब तक:</label>
+                    <input type="date" id="filterToDate" style="width:100%; padding:6px; font-size:13px; border-radius:4px; border:1px solid #ccc;">
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button id="applyCustomFilterBtn" style="padding: 8px; font-size: 13px; background: #34495e; flex: 1;">हिसाब देखें</button>
+                <button id="downloadCustomExcelBtn" style="padding: 8px; font-size: 13px; background: #e67e22; flex: 1;">Excel डाउनलोड</button>
+                <button id="resetFilterBtn" style="padding: 8px; font-size: 13px; background: #7f8c8d; width: auto;">आज</button>
+            </div>
+        </div>
+        
+        <h3>📊 डेटा लिस्ट (<span id="listTitleLabel">Today's History</span>)</h3>
+        <div class="table-wrapper">
+            <table id="todayTable">
+                <thead>
+                    <tr>
+                        <th>तारीख</th>
+                        <th>साइज</th>
+                        <th>मात्रा</th>
+                        <th>रेट</th>
+                        <th>टोटल</th>
+                        <th>एक्शन</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
